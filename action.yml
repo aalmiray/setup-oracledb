@@ -1,0 +1,99 @@
+name: Oracle-DB
+
+description: 'Setup Oracle DB on Docker'
+
+branding:
+  icon: 'database'
+  color: 'red'
+
+inputs:
+  tag:
+    description: 'Valid image tag from https://github.com/gvenzl/oci-oracle-xe'
+    default: 'latest'
+    required: false
+
+  port:
+    description: 'Exposed port for database connections.'
+    default: '1521'
+    required: false
+
+  container-name:
+    description: 'Name for the container'
+    default: 'oracledb'
+    required: false
+
+  health-max-retries:
+    description: 'Number of tries for checking database is up'
+    default: '20'
+    required: false
+
+  health-interval:
+    description: 'Time interval between health checks, in seconds'
+    default: '10'
+    required: false
+
+  volume:
+    description: 'Volume containing database files.'
+    required: false
+
+  cache-volume-key:
+    description: 'Cache key for restoring cached database volume. Requires that `volume` be set.'
+    required: false
+
+  oracle-password:
+    description: 'Password for the Oracle Database `SYS` and `SYSTEM` users.'
+    required: false
+
+  oracle-database:
+    description: 'Create a new pluggable database with the specified name.'
+    required: false
+
+  app-user:
+    description: 'Create a new database schema user with the specified name.'
+    required: true
+
+  app-user-password:
+    description: 'Define a password for the database schema user specified by `app-user`.'
+    required: true
+
+  init-scripts:
+    description: 'Additional database initialization scripts.'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check runner
+      if: runner.os != 'Linux'
+      shell: bash
+      run: |
+        echo "::error:: Only Linux runners are supported at the moment"
+        exit 1
+
+    - name: Cache volume
+      if: inputs.cache-volume-key != ''
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.volume }}
+        key: ${{ inputs.cache-volume-key }}
+        restore-keys: ${{ inputs.cache-volume-key }}
+
+    - uses: webiny/action-post-run@3f7d10fe58882125a35b3034e45cd8a8b3ac3678
+      with:
+        run: sh "${{ github.action_path }}/backup-volume.sh" ${{ inputs.volume }}
+
+    - name: Setup database
+      shell: bash
+      run: sh "${{ github.action_path }}/setup-oracledb.sh"
+      env:
+        SETUP_TAG: ${{ inputs.tag }}
+        SETUP_PORT: ${{ inputs.port }}
+        SETUP_CONTAINER_NAME: ${{ inputs.container-name }}
+        SETUP_HEALTH_MAX_RETRIES: ${{ inputs.health-max-retries }}
+        SETUP_HEALTH_INTERVAL: ${{ inputs.health-interval }}
+        SETUP_VOLUME: ${{ inputs.volume }}
+        SETUP_ORACLE_PASSWORD: ${{ inputs.oracle-password }}
+        SETUP_ORACLE_DATABASE: ${{ inputs.oracle-database }}
+        SETUP_APP_USER: ${{ inputs.app-user }}
+        SETUP_APP_USER_PASSWORD: ${{ inputs.app-user-password }}
+        SETUP_INIT_SCRIPTS: ${{ inputs.init-scripts }}
